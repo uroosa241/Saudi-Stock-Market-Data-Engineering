@@ -24,7 +24,8 @@ models:
     description: Intraday delayed quote snapshots. Liquidity flattened, auction dropped. Merge key (symbol, updated_at).
     tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns: [symbol, updated_at]
+          arguments:
+            combination_of_columns: [symbol, updated_at]
     columns:
       - name: symbol
         tests: [not_null]
@@ -39,7 +40,8 @@ models:
       - name: snapshot_type
         tests:
           - accepted_values:
-              values: [intraday_delayed_snapshot]
+              arguments:
+                values: [intraday_delayed_snapshot]
       - name: _source_file
         tests: [not_null]
       - name: _ingested_at
@@ -49,14 +51,9 @@ models:
     description: Intraday delayed sector snapshots, one row per sector per snapshot. Merge key (sector_name, snapshot_ts).
     tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns: [sector_name, snapshot_ts]
-      # Every snapshot must contain all 21 TASI sectors. Warns until the feed's top-N limit is removed.
-      - dbt_utils.expression_is_true:
-          name: sector_count_is_21
-          expression: "count(distinct sector_name) = {{ var('expected_sector_count') }}"
-          group_by_columns: [snapshot_ts]
-          config:
-            severity: "{{ 'error' if var('fail_on_incomplete') else 'warn' }}"
+          arguments:
+            combination_of_columns: [sector_name, snapshot_ts]
+      # Sector count = 21 per snapshot: see tests/assert_sector_count_is_21.sql
     columns:
       - name: sector_name
         tests: [not_null]
@@ -70,7 +67,8 @@ models:
       - name: snapshot_type
         tests:
           - accepted_values:
-              values: [intraday_delayed_snapshot]
+              arguments:
+                values: [intraday_delayed_snapshot]
       - name: _ingested_at
         tests: [not_null]
 
@@ -78,7 +76,8 @@ models:
     description: Intraday delayed TASI market snapshots. Merge key (index, timestamp).
     tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns: [index, timestamp]
+          arguments:
+            combination_of_columns: [index, timestamp]
     columns:
       - name: index
         tests: [not_null]
@@ -92,6 +91,7 @@ models:
       - name: snapshot_type
         tests:
           - accepted_values:
-              values: [intraday_delayed_snapshot]
+              arguments:
+                values: [intraday_delayed_snapshot]
       - name: _ingested_at
         tests: [not_null]

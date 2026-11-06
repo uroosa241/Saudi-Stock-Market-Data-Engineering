@@ -8,7 +8,8 @@ models:
     description: Sector performance by trade_date (latest snapshot of each sector per day), ranked by change_percent.
     tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns: [trade_date, sector_name]
+          arguments:
+            combination_of_columns: [trade_date, sector_name]
     columns:
       - name: trade_date
         tests: [not_null]
@@ -23,15 +24,18 @@ models:
       - name: snapshot_type
         tests:
           - accepted_values:
-              values: [intraday_delayed_snapshot]
+              arguments:
+                values: [intraday_delayed_snapshot]
 
   - name: top_movers_daily
     description: Top N gainers and losers by trade_date (var top_n_movers), from each symbol's latest quote of the day.
     tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns: [trade_date, mover_type, mover_rank]
+          arguments:
+            combination_of_columns: [trade_date, mover_type, mover_rank]
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns: [trade_date, mover_type, symbol]
+          arguments:
+            combination_of_columns: [trade_date, mover_type, symbol]
     columns:
       - name: trade_date
         tests: [not_null]
@@ -39,7 +43,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: [gainer, loser]
+              arguments:
+                values: [gainer, loser]
       - name: mover_rank
         tests: [not_null]
       - name: symbol
@@ -49,13 +54,15 @@ models:
       - name: snapshot_type
         tests:
           - accepted_values:
-              values: [intraday_delayed_snapshot]
+              arguments:
+                values: [intraday_delayed_snapshot]
 
   - name: market_summary_daily
     description: TASI market summary by trade_date (latest snapshot per day) with intraday low/high across snapshots.
     tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns: [trade_date, index_code]
+          arguments:
+            combination_of_columns: [trade_date, index_code]
     columns:
       - name: trade_date
         tests: [not_null]
@@ -74,4 +81,5 @@ models:
       - name: snapshot_type
         tests:
           - accepted_values:
-              values: [intraday_delayed_snapshot]
+              arguments:
+                values: [intraday_delayed_snapshot]

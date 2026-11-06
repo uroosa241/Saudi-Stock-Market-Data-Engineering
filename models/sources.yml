@@ -11,16 +11,18 @@ sources:
       All data is intraday, delayed snapshots (is_delayed = true), not end-of-day closes.
     database: "{{ var('bronze_catalog') }}"
     schema: "{{ var('bronze_schema') }}"
-    meta:
-      location: abfss://bronze@stsaudifm.dfs.core.windows.net/saudi_stock_market
+    config:
+      meta:
+        location: abfss://bronze@stsaudifm.dfs.core.windows.net/saudi_stock_market
 
     tables:
       - name: raw_companies
         description: >
           Paginated envelope {results[], count, total, limit, offset}, one row per listed security in results.
           Known issue: only page 1 is extracted (100 of 523).
-        meta:
-          location: abfss://bronze@stsaudifm.dfs.core.windows.net/saudi_stock_market/companies
+        config:
+          meta:
+            location: abfss://bronze@stsaudifm.dfs.core.windows.net/saudi_stock_market/companies
         columns: &bronze_columns
           - name: payload
             description: Raw JSON text of the file.
@@ -42,8 +44,9 @@ sources:
         description: >
           One quote object per symbol: prices, volume, bid/ask, nested liquidity struct, always-null auction,
           updated_at (ISO string with offset). Known issue: only symbol 2222 is extracted.
-        meta:
-          location: abfss://bronze@stsaudifm.dfs.core.windows.net/saudi_stock_market/stock_prices
+        config:
+          meta:
+            location: abfss://bronze@stsaudifm.dfs.core.windows.net/saudi_stock_market/stock_prices
         columns: *bronze_columns
 
       - name: raw_sector_performance
@@ -51,14 +54,16 @@ sources:
           {index, count, is_delayed, sectors[]} with change_percent, volume and num_stocks per sector.
           No timestamp in the payload; the file write time is the snapshot time.
           Known issue: top-N list (20 of 21 sectors; Energy/Telecom missing); count is the returned count, not the total.
-        meta:
-          location: abfss://bronze@stsaudifm.dfs.core.windows.net/saudi_stock_market/sector_performance
+        config:
+          meta:
+            location: abfss://bronze@stsaudifm.dfs.core.windows.net/saudi_stock_market/sector_performance
         columns: *bronze_columns
 
       - name: raw_market_summary
         description: >
           One TASI index snapshot: index_value, change, total_volume, advancing/declining/unchanged,
           vendor-derived market_mood, timestamp (ISO string with offset).
-        meta:
-          location: abfss://bronze@stsaudifm.dfs.core.windows.net/saudi_stock_market/market_summary
+        config:
+          meta:
+            location: abfss://bronze@stsaudifm.dfs.core.windows.net/saudi_stock_market/market_summary
         columns: *bronze_columns
