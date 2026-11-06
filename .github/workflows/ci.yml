@@ -1,0 +1,62 @@
+name: dbt CI
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dbt-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  dbt-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # Values come from GitHub repository secrets; nothing sensitive is stored in this file.
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_HTTP_PATH: ${{ secrets.DATABRICKS_HTTP_PATH }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      # Per-PR schema; the CI branch of generate_schema_name builds ci_pr_<N>_silver and ci_pr_<N>_gold.
+      DBT_CI_SCHEMA: ci_pr_${{ github.event.pull_request.number }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dbt
+        run: |
+          python -m pip install --upgrade pip
+          pip install "dbt-core>=1.10,<2.0" "dbt-databricks>=1.10,<2.0"
+
+      - name: Write profiles.yml
+        # Quoted heredoc: dbt resolves env_var() at runtime, so the file holds no secret values.
+        run: |
+          mkdir -p ~/.dbt
+          cat > ~/.dbt/profiles.yml <<'EOF'
+          saudi_stock_market:
+            target: ci
+            outputs:
+              ci:
+                type: databricks
+                catalog: dbt_saudi
+                schema: "{{ env_var('DBT_CI_SCHEMA') }}"
+                host: "{{ env_var('DATABRICKS_HOST') }}"
+                http_path: "{{ env_var('DATABRICKS_HTTP_PATH') }}"
+                token: "{{ env_var('DATABRICKS_TOKEN') }}"
+                threads: 4
+          EOF
+
+      - name: dbt deps
+        run: dbt deps
+
+      - name: dbt build
+        run: dbt build --target ci
