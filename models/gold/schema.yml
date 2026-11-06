@@ -1,0 +1,77 @@
+version: 2
+
+# Gold is built from silver intraday delayed snapshots. "Daily" means the latest snapshot available
+# for each Riyadh trade_date, not an official end-of-day close.
+
+models:
+  - name: sector_performance_daily
+    description: Sector performance by trade_date (latest snapshot of each sector per day), ranked by change_percent.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [trade_date, sector_name]
+    columns:
+      - name: trade_date
+        tests: [not_null]
+      - name: sector_name
+        tests: [not_null]
+      - name: change_percent
+        tests: [not_null]
+      - name: num_stocks
+        tests: [not_null]
+      - name: performance_rank
+        tests: [not_null]
+      - name: snapshot_type
+        tests:
+          - accepted_values:
+              values: [intraday_delayed_snapshot]
+
+  - name: top_movers_daily
+    description: Top N gainers and losers by trade_date (var top_n_movers), from each symbol's latest quote of the day.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [trade_date, mover_type, mover_rank]
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [trade_date, mover_type, symbol]
+    columns:
+      - name: trade_date
+        tests: [not_null]
+      - name: mover_type
+        tests:
+          - not_null
+          - accepted_values:
+              values: [gainer, loser]
+      - name: mover_rank
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: change_percent
+        tests: [not_null]
+      - name: snapshot_type
+        tests:
+          - accepted_values:
+              values: [intraday_delayed_snapshot]
+
+  - name: market_summary_daily
+    description: TASI market summary by trade_date (latest snapshot per day) with intraday low/high across snapshots.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [trade_date, index_code]
+    columns:
+      - name: trade_date
+        tests: [not_null]
+      - name: index_code
+        tests: [not_null]
+      - name: index_value
+        tests: [not_null]
+      - name: advancing
+        tests: [not_null]
+      - name: declining
+        tests: [not_null]
+      - name: unchanged
+        tests: [not_null]
+      - name: market_mood
+        description: Vendor-derived label; not a business definition we control.
+      - name: snapshot_type
+        tests:
+          - accepted_values:
+              values: [intraday_delayed_snapshot]
