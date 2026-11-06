@@ -1,0 +1,67 @@
+name: dbt CI cleanup
+
+# Drops the per-PR CI schemas when a pull request into main is closed (merged or not).
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dbt-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  drop-ci-schemas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Values come from GitHub repository secrets; nothing sensitive is stored in this file.
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_HTTP_PATH: ${{ secrets.DATABRICKS_HTTP_PATH }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      CI_CATALOG: dbt_saudi
+
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Databricks SQL connector
+        run: pip install "databricks-sql-connector>=3.0,<5.0"
+
+      - name: Drop CI schemas for this PR
+        run: |
+          python - <<'EOF'
+          import os, re, sys
+          from databricks import sql
+
+          catalog = os.environ["CI_CATALOG"]
+          pr = os.environ["PR_NUMBER"]
+          if not re.fullmatch(r"[0-9]+", pr):
+              sys.exit(f"Refusing: PR number {pr!r} is not numeric")
+
+          schemas = [f"ci_pr_{pr}", f"ci_pr_{pr}_silver", f"ci_pr_{pr}_gold"]
+
+          # Guard: only ci_pr_<N>[_silver|_gold]; never silver, gold or anything else.
+          allowed = re.compile(r"ci_pr_[0-9]+(_silver|_gold)?")
+          for s in schemas:
+              if not allowed.fullmatch(s) or s in ("silver", "gold", "bronze"):
+                  sys.exit(f"Refusing to drop schema {s!r}")
+
+          host = os.environ["DATABRICKS_HOST"].removeprefix("https://").rstrip("/")
+          with sql.connect(
+              server_hostname=host,
+              http_path=os.environ["DATABRICKS_HTTP_PATH"],
+              access_token=os.environ["DATABRICKS_TOKEN"],
+          ) as conn, conn.cursor() as cur:
+              for s in schemas:
+                  stmt = f"DROP SCHEMA IF EXISTS `{catalog}`.`{s}` CASCADE"
+                  print(stmt)
+                  cur.execute(stmt)
+          print("Done")
+          EOF
