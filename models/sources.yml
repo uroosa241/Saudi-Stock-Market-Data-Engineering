@@ -1,0 +1,64 @@
+version: 2
+
+sources:
+  - name: bronze
+    description: >
+      Raw Saudi stock market API payloads landed in ADLS at
+      abfss://bronze@stsaudifm.dfs.core.windows.net/saudi_stock_market and ingested by Auto Loader
+      (notebooks/silver, cell "Bronze ingestion with history") into Delta tables, one row per file version.
+      The source overwrites a single JSON file per folder, so these tables are the only history.
+      `payload` holds the raw JSON text (BOM and CRLF stripped); silver applies an explicit schema.
+      All data is intraday, delayed snapshots (is_delayed = true), not end-of-day closes.
+    database: "{{ var('bronze_catalog') }}"
+    schema: "{{ var('bronze_schema') }}"
+    meta:
+      location: abfss://bronze@stsaudifm.dfs.core.windows.net/saudi_stock_market
+
+    tables:
+      - name: raw_companies
+        description: >
+          Paginated envelope {results[], count, total, limit, offset}, one row per listed security in results.
+          Known issue: only page 1 is extracted (100 of 523).
+        meta:
+          location: abfss://bronze@stsaudifm.dfs.core.windows.net/saudi_stock_market/companies
+        columns: &bronze_columns
+          - name: payload
+            description: Raw JSON text of the file.
+            tests: [not_null]
+          - name: _source_file
+            description: Full ADLS path of the file the row came from.
+            tests: [not_null]
+          - name: _file_modification_time
+            description: File write time in ADLS (UTC).
+          - name: _file_size
+            description: File size in bytes.
+          - name: _ingested_at
+            description: Time Auto Loader ingested the file (UTC). Used as the incremental watermark.
+            tests: [not_null]
+          - name: _payload_hash
+            description: SHA-256 of the payload, for change detection.
+
+      - name: raw_stock_prices
+        description: >
+          One quote object per symbol: prices, volume, bid/ask, nested liquidity struct, always-null auction,
+          updated_at (ISO string with offset). Known issue: only symbol 2222 is extracted.
+        meta:
+          location: abfss://bronze@stsaudifm.dfs.core.windows.net/saudi_stock_market/stock_prices
+        columns: *bronze_columns
+
+      - name: raw_sector_performance
+        description: >
+          {index, count, is_delayed, sectors[]} with change_percent, volume and num_stocks per sector.
+          No timestamp in the payload; the file write time is the snapshot time.
+          Known issue: top-N list (20 of 21 sectors; Energy/Telecom missing); count is the returned count, not the total.
+        meta:
+          location: abfss://bronze@stsaudifm.dfs.core.windows.net/saudi_stock_market/sector_performance
+        columns: *bronze_columns
+
+      - name: raw_market_summary
+        description: >
+          One TASI index snapshot: index_value, change, total_volume, advancing/declining/unchanged,
+          vendor-derived market_mood, timestamp (ISO string with offset).
+        meta:
+          location: abfss://bronze@stsaudifm.dfs.core.windows.net/saudi_stock_market/market_summary
+        columns: *bronze_columns

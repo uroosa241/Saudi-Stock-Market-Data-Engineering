@@ -1,0 +1,97 @@
+version: 2
+
+# All silver data is intraday, delayed snapshots (snapshot_type = intraday_delayed_snapshot), not daily closes.
+# Prices and amounts are DECIMAL(18,4); timestamps are UTC; trade_date is Asia/Riyadh.
+
+models:
+  - name: companies
+    description: One row per listed security (latest version). Sukuk null market filled from market_segment; sector from the symbol_sector_map seed.
+    columns:
+      - name: symbol
+        description: 4-digit Tadawul symbol. Merge key.
+        tests: [unique, not_null]
+      - name: market
+        tests: [not_null]
+      - name: api_total
+        description: Vendor-reported total number of securities.
+        tests: [not_null]
+      - name: _source_file
+        tests: [not_null]
+      - name: _ingested_at
+        tests: [not_null]
+
+  - name: quotes
+    description: Intraday delayed quote snapshots. Liquidity flattened, auction dropped. Merge key (symbol, updated_at).
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [symbol, updated_at]
+    columns:
+      - name: symbol
+        tests: [not_null]
+      - name: updated_at
+        description: Quote time (UTC).
+        tests: [not_null]
+      - name: trade_date
+        description: Trading day in Asia/Riyadh.
+        tests: [not_null]
+      - name: price
+        tests: [not_null]
+      - name: snapshot_type
+        tests:
+          - accepted_values:
+              values: [intraday_delayed_snapshot]
+      - name: _source_file
+        tests: [not_null]
+      - name: _ingested_at
+        tests: [not_null]
+
+  - name: sector_snapshots
+    description: Intraday delayed sector snapshots, one row per sector per snapshot. Merge key (sector_name, snapshot_ts).
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [sector_name, snapshot_ts]
+      # Every snapshot must contain all 21 TASI sectors. Warns until the feed's top-N limit is removed.
+      - dbt_utils.expression_is_true:
+          name: sector_count_is_21
+          expression: "count(distinct sector_name) = {{ var('expected_sector_count') }}"
+          group_by_columns: [snapshot_ts]
+          config:
+            severity: "{{ 'error' if var('fail_on_incomplete') else 'warn' }}"
+    columns:
+      - name: sector_name
+        tests: [not_null]
+      - name: snapshot_ts
+        description: Bronze file write time (UTC); the payload has no timestamp.
+        tests: [not_null]
+      - name: trade_date
+        tests: [not_null]
+      - name: num_stocks
+        tests: [not_null]
+      - name: snapshot_type
+        tests:
+          - accepted_values:
+              values: [intraday_delayed_snapshot]
+      - name: _ingested_at
+        tests: [not_null]
+
+  - name: market_snapshots
+    description: Intraday delayed TASI market snapshots. Merge key (index, timestamp).
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [index, timestamp]
+    columns:
+      - name: index
+        tests: [not_null]
+      - name: timestamp
+        description: Snapshot time (UTC).
+        tests: [not_null]
+      - name: trade_date
+        tests: [not_null]
+      - name: index_value
+        tests: [not_null]
+      - name: snapshot_type
+        tests:
+          - accepted_values:
+              values: [intraday_delayed_snapshot]
+      - name: _ingested_at
+        tests: [not_null]

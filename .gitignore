@@ -1,0 +1,23 @@
+# dbt build artifacts
+target/
+dbt_packages/
+logs/
+.user.yml
+
+# Credentials and local config: never commit
+profiles.yml
+.env
+.env.*
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

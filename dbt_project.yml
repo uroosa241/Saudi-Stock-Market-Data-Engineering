@@ -1,0 +1,43 @@
+name: saudi_stock_market
+version: "1.0.0"
+config-version: 2
+
+# Connection lives in ~/.dbt/profiles.yml (never in this repo). Target catalog: dbt_saudi.
+profile: saudi_stock_market
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages", "logs"]
+
+vars:
+  bronze_catalog: dbt_saudi
+  bronze_schema: bronze
+  local_tz: "Asia/Riyadh"          # trade_date is derived in Riyadh time; timestamps are stored in UTC
+  expected_sector_count: 21         # all TASI sectors
+  top_n_movers: 10
+  # Completeness tests (sector count, companies loaded = total, breadth reconciliation) warn while false.
+  # Set to true once the API extract is fixed (all 523 companies, all symbols, all 21 sectors).
+  fail_on_incomplete: false
+
+models:
+  saudi_stock_market:
+    +file_format: delta
+    silver:
+      +schema: silver
+      +materialized: incremental
+      +incremental_strategy: merge
+      +on_schema_change: append_new_columns
+    gold:
+      +schema: gold
+      +materialized: table
+
+seeds:
+  saudi_stock_market:
+    +schema: silver
+    symbol_sector_map:
+      +column_types:
+        symbol: string
+        sector_name: string
